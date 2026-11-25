@@ -43,12 +43,19 @@ jobs:
           fi
           echo "==> Source branch: $SOURCE_BRANCH"
 
+          # Dependabot changes must go through their pull request, not be copied to other branches.
+          if [[ "$SOURCE_BRANCH" == dependabot/* ]]; then
+            echo "Source is a Dependabot branch. Skipping sync."
+            exit 0
+          fi
+
           git fetch --all --prune
           git checkout "$SOURCE_BRANCH"
 
           TARGET_BRANCHES=()
           while IFS= read -r branch; do
-            if [ -n "$branch" ] && [ "$branch" != "HEAD" ] && [ "$branch" != "$SOURCE_BRANCH" ]; then
+            # Skip Dependabot branches: committing to them stops Dependabot from rebasing its PRs.
+            if [ -n "$branch" ] && [ "$branch" != "HEAD" ] && [ "$branch" != "$SOURCE_BRANCH" ] && [[ "$branch" != dependabot/* ]]; then
               TARGET_BRANCHES+=("$branch")
             fi
           done < <(git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/)
@@ -175,7 +182,9 @@ jobs:
               fi
             done
 
-            rsync -av --delete "$TEMP_DIR/" ./
+            # Copy the synced items over the branch. Never use --delete here: on the repo root it
+            # removes .git and every file that isn't a sync item (src/, tests/, ...).
+            rsync -av "$TEMP_DIR/" ./
             git add -A
 
             if git diff --staged --quiet; then
