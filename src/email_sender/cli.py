@@ -2,6 +2,7 @@
 
 Without ``--send`` nothing is delivered: the command prints a preview of
 the first message and the list of people who would receive it.
+``email-sender ui`` starts the web interface instead.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .campaign import build_messages, build_test_message, plan_campaign, sample_recipient
 from .config import ConfigError, Settings, load_settings
-from .recipients import Recipient, RecipientError, is_valid_email, load_recipients
-from .sender import SendLog, build_message, open_smtp, send_all, send_test
-from .templates import TemplateError, load_template, render
+from .recipients import Recipient, RecipientError, is_valid_email
+from .sender import SendLog, open_smtp, send_all, send_test
+from .templates import TemplateError, load_template
 
 PREVIEW_LIST_LIMIT = 20
 
@@ -23,7 +25,8 @@ PREVIEW_LIST_LIMIT = 20
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="email-sender",
-        description="Send a personalised email to each subscriber in a CSV list, one message per person.",
+        description="Send a personalised email to each subscriber in a CSV list, one message per person. "
+                    "Run 'email-sender ui' to use the web interface instead.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-t", "--template", required=True, type=Path,
@@ -82,38 +85,27 @@ def run(args: argparse.Namespace) -> int:
 
     settings = load_settings(args.env_file, require_smtp=bool(args.send or args.test_to))
     template = load_template(args.template, args.html)
-    loaded = load_recipients(args.recipients, set(args.tag) or None)
-    for reason in loaded.skipped:
+    log = SendLog(args.log)
+    plan = plan_campaign(args.recipients, set(args.tag), args.campaign or args.template.stem, log, args.limit)
+    for reason in plan.skipped:
         print(f"skipped {reason}")
 
-    campaign = args.campaign or args.template.stem
-    log = SendLog(args.log)
-    already = log.sent_to(campaign)
-    pending = [r for r in loaded.recipients if r.email not in already]
-    if args.limit is not None:
-        pending = pending[: args.limit]
-
     if args.test_to:
-        sample = (pending or loaded.recipients or [Recipient(email=args.test_to)])[0]
-        rendered = render(template, sample)
-        msg = build_message(settings, sample, rendered)
-        msg.replace_header("To", args.test_to)
-        msg.replace_header("Subject", f"[TEST] {rendered.subject}")
-        send_test(settings, msg, connect=open_smtp)
+        sample = sample_recipient(plan, args.test_to)
+        send_test(settings, build_test_message(settings, template, sample, args.test_to), connect=open_smtp)
         print(f"Test email (rendered for {sample.email}) sent to {args.test_to}. Nothing was logged.")
         return 0
 
-    # Render every message up front so a template problem stops the run before the first send.
-    messages = [(r, build_message(settings, r, render(template, r))) for r in pending]
-    done = len(already & {r.email for r in loaded.recipients})
-    print(f"Campaign '{campaign}': {len(loaded.recipients)} eligible, {done} already sent, "
+    messages = build_messages(settings, template, plan.pending)
+    campaign = plan.campaign
+    print(f"Campaign '{campaign}': {len(plan.eligible)} eligible, {plan.already_sent} already sent, "
           f"{len(messages)} to send in this run.")
     if not messages:
         print("Nothing to send.")
         return 0
 
     if not args.send:
-        _print_preview(settings, pending, messages[0][1])
+        _print_preview(settings, plan.pending, messages[0][1])
         print("\nPreview only - nothing was sent. Add --send to deliver, or --test-to YOUR@ADDRESS to try it first.")
         return 0
 
@@ -131,6 +123,11 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["ui"]:
+        from .web.server import main as ui_main
+
+        return ui_main(argv[1:])
     args = build_parser().parse_args(argv)
     try:
         return run(args)

@@ -3,7 +3,14 @@ import unittest
 from pathlib import Path
 
 from email_sender.recipients import Recipient
-from email_sender.templates import TemplateError, load_template, render
+from email_sender.templates import (
+    TemplateError,
+    compose_template_text,
+    load_template,
+    parse_template,
+    render,
+    split_template_text,
+)
 
 
 class TemplateTests(unittest.TestCase):
@@ -43,6 +50,20 @@ class TemplateTests(unittest.TestCase):
     def test_stray_dollar(self):
         with self.assertRaisesRegex(TemplateError, r"\$\$"):
             load_template(self.write("t.txt", "Subject: Hi\n\nOnly $5 today\n"))
+
+    def test_compose_split_parse_round_trip(self):
+        raw = compose_template_text("  Hi $first_name ", "\r\nLine one\r\nLine two\r\n\r\n")
+        self.assertEqual(raw, "Subject: Hi $first_name\n\nLine one\nLine two\n")
+        self.assertEqual(split_template_text(raw), ("Hi $first_name", "Line one\nLine two\n"))
+        self.assertIsNone(split_template_text("no subject here"))
+        tmpl = parse_template(raw, "<p>$name</p>", "editor")
+        self.assertEqual((tmpl.subject, tmpl.html), ("Hi $first_name", "<p>$name</p>"))
+
+    def test_parse_errors_use_label(self):
+        with self.assertRaisesRegex(TemplateError, "^Message"):
+            parse_template(compose_template_text("", "Body"), label="Message")
+        with self.assertRaisesRegex(TemplateError, "^HTML version"):
+            parse_template(compose_template_text("Hi", "Body"), "<p>$bad</p>", "Message", "HTML version")
 
     def test_html_values_are_escaped(self):
         text = self.write("t.txt", "Subject: Hi\n\nHi $name\n")

@@ -53,22 +53,39 @@ def _check(source: str, label: str) -> None:
         raise TemplateError(f"{label}: unknown placeholder(s) {', '.join('$' + u for u in unknown)} (allowed: {allowed})")
 
 
-def load_template(text_path: Path, html_path: Path | None = None) -> EmailTemplate:
-    raw = text_path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
-    header, sep, body = raw.partition("\n\n")
-    if not sep or not header.lower().startswith("subject:"):
-        raise TemplateError(f"{text_path}: must start with a 'Subject: ...' line followed by a blank line")
-    subject = header[len("subject:"):].strip()
-    if not subject or "\n" in subject:
-        raise TemplateError(f"{text_path}: the subject must be a single, non-empty line")
-    body = body.strip("\n") + "\n"
-    html_body = html_path.read_text(encoding="utf-8-sig") if html_path else None
+def compose_template_text(subject: str, body: str) -> str:
+    """The on-disk form of a text template."""
+    body = body.replace("\r\n", "\n").strip("\n")
+    return f"Subject: {subject.strip()}\n\n{body}\n"
 
-    _check(subject, f"{text_path} (subject)")
-    _check(body, str(text_path))
+
+def split_template_text(raw: str) -> tuple[str, str] | None:
+    """Return (subject, body), or None if ``raw`` has no 'Subject:' header."""
+    header, sep, body = raw.replace("\r\n", "\n").partition("\n\n")
+    if not sep or not header.lower().startswith("subject:"):
+        return None
+    return header[len("subject:"):].strip(), body.strip("\n") + "\n"
+
+
+def parse_template(raw: str, html_body: str | None = None, label: str = "template",
+                   html_label: str = "HTML version") -> EmailTemplate:
+    parts = split_template_text(raw)
+    if parts is None:
+        raise TemplateError(f"{label}: must start with a 'Subject: ...' line followed by a blank line")
+    subject, body = parts
+    if not subject or "\n" in subject:
+        raise TemplateError(f"{label}: the subject must be a single, non-empty line")
+    _check(subject, f"{label} (subject)")
+    _check(body, label)
     if html_body is not None:
-        _check(html_body, str(html_path))
+        _check(html_body, html_label)
     return EmailTemplate(subject=subject, text=body, html=html_body)
+
+
+def load_template(text_path: Path, html_path: Path | None = None) -> EmailTemplate:
+    raw = text_path.read_text(encoding="utf-8-sig")
+    html_body = html_path.read_text(encoding="utf-8-sig") if html_path else None
+    return parse_template(raw, html_body, str(text_path), str(html_path))
 
 
 def placeholder_values(recipient: Recipient) -> dict[str, str]:

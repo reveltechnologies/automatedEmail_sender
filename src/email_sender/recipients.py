@@ -52,7 +52,7 @@ def _clean(value: str | None) -> str:
     return " ".join((value or "").split())
 
 
-def _sniff_dialect(sample: str) -> type[csv.Dialect] | csv.Dialect:
+def sniff_dialect(sample: str) -> type[csv.Dialect] | csv.Dialect:
     # Excel saves CSV with ';' in many European locales.
     try:
         return csv.Sniffer().sniff(sample, delimiters=",;\t")
@@ -70,7 +70,7 @@ def load_recipients(path: Path, tags: set[str] | None = None) -> LoadResult:
     with path.open(newline="", encoding="utf-8-sig") as fh:
         sample = fh.read(4096)
         fh.seek(0)
-        reader = csv.DictReader(fh, dialect=_sniff_dialect(sample))
+        reader = csv.DictReader(fh, dialect=sniff_dialect(sample))
         if not reader.fieldnames:
             raise RecipientError(f"{path} is empty")
         columns = {name.strip().lower(): name for name in reader.fieldnames if name}

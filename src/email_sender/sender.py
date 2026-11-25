@@ -87,6 +87,22 @@ class SendLog:
                 if row.get("campaign") == campaign and row.get("result") == "sent"
             }
 
+    def summary(self) -> list[dict]:
+        """Per campaign: how many people got it, how many still failed, and when it last ran."""
+        if not self.path.is_file():
+            return []
+        campaigns: dict[str, dict] = {}
+        with self.path.open(newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                entry = campaigns.setdefault(row.get("campaign", ""), {"sent": set(), "failed": set(), "last": ""})
+                (entry["sent"] if row.get("result") == "sent" else entry["failed"]).add(row.get("email", ""))
+                entry["last"] = max(entry["last"], row.get("timestamp", ""))
+        result = [
+            {"campaign": name, "sent": len(e["sent"]), "failed": len(e["failed"] - e["sent"]), "last": e["last"]}
+            for name, e in campaigns.items()
+        ]
+        return sorted(result, key=lambda item: item["last"], reverse=True)
+
     def record(self, campaign: str, email: str, result: str, detail: str = "") -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         is_new = not self.path.exists()
@@ -138,6 +154,7 @@ def send_test(settings: Settings, msg: EmailMessage, connect: Callable[[Settings
 class SendReport:
     sent: int = 0
     failed: list[tuple[str, str]] = field(default_factory=list)
+    stopped: bool = False
 
 
 def send_all(
@@ -150,34 +167,49 @@ def send_all(
     connect: Callable[[Settings], smtplib.SMTP] = open_smtp,
     sleep: Callable[[float], None] = time.sleep,
     progress: Callable[[str], None] = print,
+    on_result: Callable[[Recipient, str, str], None] | None = None,
+    should_stop: Callable[[], bool] = lambda: False,
 ) -> SendReport:
     """Send each message, logging every attempt as it happens.
 
     A refused recipient is logged and skipped. Any other SMTP or network
     error stops the run (after logging), because it usually means every
     following message would fail too; re-running resumes where it stopped.
+    ``should_stop`` is checked before each message so a run can be stopped
+    cleanly between two emails.
     """
     report = SendReport()
     total = len(messages)
+
+    def finish(recipient: Recipient, result: str, detail: str = "") -> None:
+        log.record(campaign, recipient.email, result, detail)
+        if result == "sent":
+            report.sent += 1
+        else:
+            report.failed.append((recipient.email, detail))
+        if on_result is not None:
+            on_result(recipient, result, detail)
+
     server = connect(settings)
     try:
         for index, (recipient, msg) in enumerate(messages, start=1):
-            if index > 1 and delay > 0:
+            if index > 1 and delay > 0 and not should_stop():
                 sleep(delay)
+            if should_stop():
+                report.stopped = True
+                progress(f"Stopped after {index - 1} of {total}.")
+                break
             try:
                 server.send_message(msg)
             except smtplib.SMTPRecipientsRefused as exc:
                 detail = "; ".join(f"{code} {reason.decode(errors='replace')}" for code, reason in exc.recipients.values())
-                log.record(campaign, recipient.email, "failed", detail)
-                report.failed.append((recipient.email, detail))
+                finish(recipient, "failed", detail)
                 progress(f"[{index}/{total}] refused {recipient.email}: {detail}")
                 continue
             except (smtplib.SMTPException, OSError) as exc:
-                log.record(campaign, recipient.email, "failed", str(exc))
-                report.failed.append((recipient.email, str(exc)))
+                finish(recipient, "failed", str(exc))
                 raise
-            log.record(campaign, recipient.email, "sent")
-            report.sent += 1
+            finish(recipient, "sent")
             progress(f"[{index}/{total}] sent to {recipient.email}")
     finally:
         _quit(server)

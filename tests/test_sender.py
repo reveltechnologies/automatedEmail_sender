@@ -68,6 +68,29 @@ class SendAllTests(unittest.TestCase):
         self.assertEqual([email for email, _ in report.failed], ["user1@example.com"])
         self.assertNotIn("user1@example.com", self.log.sent_to("welcome"))
 
+    def test_should_stop_halts_between_messages(self):
+        server = FakeSMTP()
+        results = []
+        report = send_all(make_settings(), self.messages, campaign="welcome", log=self.log, delay=0,
+                          connect=server, progress=lambda _: None,
+                          on_result=lambda r, result, detail: results.append((r.email, result)),
+                          should_stop=lambda: len(server.sent) >= 2)
+        self.assertTrue(report.stopped)
+        self.assertEqual(report.sent, 2)
+        self.assertEqual(results, [("user0@example.com", "sent"), ("user1@example.com", "sent")])
+        self.assertTrue(server.closed)
+
+    def test_summary_per_campaign(self):
+        self.log.record("welcome", "a@example.com", "sent")
+        self.log.record("welcome", "b@example.com", "failed", "550")
+        self.log.record("welcome", "b@example.com", "sent")  # retried successfully
+        self.log.record("welcome", "c@example.com", "failed", "550")
+        self.log.record("update", "a@example.com", "sent")
+        summary = {s["campaign"]: s for s in self.log.summary()}
+        self.assertEqual((summary["welcome"]["sent"], summary["welcome"]["failed"]), (2, 1))
+        self.assertEqual((summary["update"]["sent"], summary["update"]["failed"]), (1, 0))
+        self.assertEqual(SendLog(Path(self.tmp.name) / "none.csv").summary(), [])
+
     def test_connection_loss_stops_and_can_resume(self):
         server = FakeSMTP(disconnect_after=1)
         with self.assertRaises(smtplib.SMTPServerDisconnected):
