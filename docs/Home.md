@@ -1,38 +1,20 @@
-# Documentation & Wiki Guide
+# Automated Email Sender
 
-Welcome to the project documentation. Files placed in this `docs/` folder are automatically mirrored to the repository's GitHub Wiki via the wiki sync workflow.
+A command-line tool for emailing our app's testers and subscribers. Each person gets their own personalised copy, so nobody sees anyone else's address.
 
----
+## Pages
 
-## Getting Started
+- [Usage](Usage): settings, the recipient list, templates, and sending.
+- [Privacy and Security](Privacy-and-Security): handling subscriber data, consent, and reporting vulnerabilities.
 
-1. **Initialize the Wiki** (First-time setup only):
-   - Go to your repository's **Wiki** tab on GitHub.
-   - Click **Create the first page** and save it (naming it `Home`). This initializes the wiki repository remote.
-2. **Add Documentation**:
-   - Create Markdown (`.md`) files inside `docs/`.
-   - Push your changes to the default branch; the sync workflow will publish them automatically.
+## The usual workflow
 
----
-
-## Special File Names
-
-GitHub Wiki uses specific reserved file names for layout elements:
-
-| File Name | Purpose |
-| --- | --- |
-| `Home.md` | The landing page of your wiki. |
-| `_Sidebar.md` | Content displayed in the navigation sidebar across all wiki pages. |
-| `_Footer.md` | Content displayed at the bottom of every wiki page. |
+1. Update `data/recipients.csv` with new sign-ups and unsubscribes.
+2. Write or reuse a template in `templates/`.
+3. Preview: `email-sender -t templates/<file>.txt -r data/recipients.csv --tag tester`
+4. Send a test to yourself with `--test-to you@yourdomain.com`.
+5. Send for real with `--send`.
 
 ---
 
-## Structuring Pages
-
-- Name pages with regular dashes or hyphens (e.g., `Getting-Started.md`, `API-Reference.md`).
-- Link between pages using standard Markdown syntax:
-  ```markdown
-  [Getting Started](Getting-Started)
-  [API Reference](API-Reference)
-  ```
-- Use `_Sidebar.md` to organize your table of contents and navigation hierarchy.
+*These pages live in the repository's `docs/` folder and are mirrored to the GitHub Wiki automatically. Edit them there, not in the Wiki.*

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!--- To add private notes or comments in this changelog that won't show in the rendered release, use markdown comments like this. -->
 
+## [Unreleased]
+<!-- Rename to "## [1.1.0] - YYYY-MM-DD" when merging to main. Pushing a version heading from any branch creates that GitHub release. -->
+
+### Added
+- `email-sender` command-line tool (`src/email_sender/`) for emailing testers and subscribers. Each person gets their own personalised copy, so recipients never see each other's addresses.
+- Subscriber list from CSV (comma or semicolon) with `status` and `tags`. Unsubscribed addresses are blocked everywhere in the file, duplicates and invalid addresses are skipped, and `--tag` picks a group.
+- Plain-text templates with an optional HTML version, using `$first_name`, `$name` and `$email` placeholders. Unknown placeholders stop the run before anything is sent.
+- Preview by default, `--test-to` for a single test copy, and `--send` with a typed confirmation.
+- Resumable delivery log (`state/sent_log.csv`) per campaign, plus `--limit` and `--delay` for working within provider sending limits.
+- Automatic unsubscribe footer and `List-Unsubscribe` header.
+- Encrypted SMTP only (STARTTLS or SSL), with settings read from `.env` or environment variables (`.env.example` provided).
+- Example recipient list and welcome template, unit tests, and `pyproject.toml`.
+- Wiki pages `docs/Usage.md` and `docs/Privacy-and-Security.md`.
+
+### Changed
+- `README.md` now describes the email sender instead of the repository template.
+- `.gitignore` now excludes subscriber data (`data/*`), the delivery log and Python build artifacts.
+
 ## [1.0.0] - 2026-10-24
 
 ### Added

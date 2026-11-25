@@ -1,0 +1,5 @@
+email,name,status,tags
+ana.tester@example.com,Ana Rossi,subscribed,tester beta
+ben@example.com,Ben Okafor,subscribed,newsletter
+chen@example.com,,subscribed,tester
+dana@example.com,Dana Smith,unsubscribed,tester

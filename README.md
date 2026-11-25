@@ -1,24 +1,64 @@
-# Repository Template
+# Automated Email Sender
 
-A pre-configured repository template with automated security scanning, release management, documentation sync, and wiki mirroring.
+Send one email to many people at once: testers, beta users and subscribers of our app. You can use it to welcome new sign-ups, announce test builds, or get back in touch with people later.
+
+Each person gets **their own copy**, personalised with their name and addressed only to them. Recipients never see each other's addresses.
+
+It is a small Python command-line tool with no third-party dependencies. It works with any SMTP provider, such as Gmail, Google Workspace or Microsoft 365.
 
 ---
 
-## Quick Start
+## Quick start
 
-### Files to edit:
-- **`README.md`**: Replace with your project's description and overview.
-- **`config.yaml`**: Enable or disable automated features and customize sync items.
-- **`LICENSE`**: Replace with your project's license (e.g., MIT, Apache 2.0).
-- **`CHANGELOG.md`**: Add your version number and release notes.
-- **`src/`**: Place your project source code files here.
-- **`docs/`**: Add documentation pages to mirror to the repository Wiki (create a `Home` page in the **Wiki** tab first to initialize. If the Wiki tab is missing, enable it in **Settings** > **General** -> **Features**; note that wikis are not available on free private repositories).
+Requires **Python 3.11+**.
 
-### When you commit and push changes, it will automatically:
-- **Run CodeQL security analysis** across all detected languages.
-- **Create or update GitHub Releases** matching the version in `CHANGELOG.md` (with comparison links and prerelease tags).
-- **Update `SECURITY.md`** to support the latest major version.
-- **Sync documentation, workflows, and templates** across all other active branches.
-- **Mirror `docs/` to GitHub Wiki** (once a Home page is created under the Wiki tab).
+```bash
+pip install -e .                     # installs the `email-sender` command
+cp .env.example .env                 # then fill in your SMTP details
+cp data/recipients.example.csv data/recipients.csv   # then add your real list
+```
 
-*(All automated actions can be toggled on or off in `config.yaml`)*
+1. **Preview.** Nothing is sent. It shows the first email and who would get it:
+   ```bash
+   email-sender -t templates/welcome-testers.txt -r data/recipients.csv --tag tester
+   ```
+2. **Send a test copy to yourself:**
+   ```bash
+   email-sender -t templates/welcome-testers.txt -r data/recipients.csv --tag tester --test-to you@yourdomain.com
+   ```
+3. **Send for real.** It asks you to type `yes` first:
+   ```bash
+   email-sender -t templates/welcome-testers.txt -r data/recipients.csv --tag tester --send
+   ```
+
+Without installing, you can run `python -m email_sender ...` with `PYTHONPATH=src`.
+
+## How it works
+
+| Piece | What it is |
+| --- | --- |
+| `data/recipients.csv` | Your list. Columns: `email` (required), `name`, `status`, `tags`. People whose `status` is anything other than blank or `subscribed` (for example `unsubscribed`) are never emailed. |
+| `templates/*.txt` | A `Subject: ...` line, a blank line, then the body. Use `$first_name`, `$name` or `$email` for personal details. Add an optional `.html` version with `--html`. |
+| `.env` | Sender address and SMTP login. See [`.env.example`](.env.example). |
+| `state/sent_log.csv` | A record of who already received each campaign. If a run stops partway, run the same command again and it continues with the people who haven't been emailed yet. |
+
+Every email gets an unsubscribe footer and a `List-Unsubscribe` header automatically.
+
+Full guide: [docs/Usage.md](docs/Usage.md). Data and security rules: [docs/Privacy-and-Security.md](docs/Privacy-and-Security.md).
+
+## Development
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Code lives in [`src/email_sender/`](src/README.md). See [CONTRIBUTING.md](CONTRIBUTING.md) for how to propose changes, and [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+
+## Repository automation
+
+This repo was created from a template that runs the following on every push. Each can be switched off in [`config.yaml`](config.yaml).
+
+- **CodeQL** security analysis (public repositories only).
+- **GitHub Releases** created from the version headings in `CHANGELOG.md`. Keep new work under `## [Unreleased]` until you merge, because pushing a version heading from any branch creates that release.
+- **`SECURITY.md`** supported-versions table kept up to date.
+- **Docs sync** across branches, and **`docs/` mirrored to the GitHub Wiki** (create a `Home` page in the Wiki tab once to enable this).

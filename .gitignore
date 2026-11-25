@@ -1,4 +1,18 @@
+# Delivery log (contains subscriber addresses)
 state/
+
+# Subscriber lists contain personal data - only the example is tracked
+data/*
+!data/recipients.example.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
 
 # Operating System
 .DS_Store
