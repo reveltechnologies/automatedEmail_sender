@@ -18,7 +18,7 @@ Copy `.env.example` to `.env` and fill it in. Any of these can also be set as re
 
 ## Using the web page
 
-Run `email-sender ui` from the project folder. Your browser opens the page. If it doesn't, copy the link printed in the terminal, which includes a one-time access key. Keep the terminal window open while you use the page.
+On Windows, double-click `start.bat` in the project folder (no install needed). Otherwise run `email-sender ui` from the project folder. Your browser opens the page. If it doesn't, copy the link printed in the terminal, which includes a one-time access key. Keep the terminal window open while you use the page.
 
 | Tab | What you do there |
 | --- | --- |

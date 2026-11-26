@@ -19,11 +19,13 @@ cp .env.example .env                 # then fill in your SMTP details
 
 ### Using the web page (easiest)
 
+On Windows, double-click **`start.bat`** in the project folder. It needs only Python 3.11+, no install. Or, after `pip install -e .`, run:
+
 ```bash
 email-sender ui
 ```
 
-Your browser opens the page. Keep the terminal window open while you use it, and press Ctrl+C there to stop.
+Your browser opens the page. Keep the terminal window open while you use it, and press Ctrl+C there (or close the window) to stop.
 
 - **Recipients:** add people, edit names and tags, and mark people as unsubscribed. Then click **Save list**, which saves to `data/recipients.csv`.
 - **Compose & send:** pick or write a template, choose a group (for example *tester*), and check the live preview. Then click **Send test to me**, and finally **Send to N people**. Progress shows on the page, and you can stop partway.

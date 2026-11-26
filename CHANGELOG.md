@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Recipients:** edit the list in a table, with validation, duplicate highlighting, a backup copy on every save, and protection against overwriting changes made in Excel.
   - **Compose & send:** template editor with placeholder buttons, group picker, live preview as any recipient, a test send, and sending with live progress and Stop.
   - **History:** per-campaign totals.
+- `start.bat`: double-click launcher for the web page on Windows. It runs from the project folder without installing anything.
 - The page is protected by a per-start access key, host and origin checks, and a strict Content-Security-Policy, and it never receives the SMTP password.
 
 ### Fixed
