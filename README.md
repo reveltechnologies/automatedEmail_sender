@@ -4,7 +4,7 @@ Send one email to many people at once: testers, beta users and subscribers of ou
 
 Each person gets **their own copy**, personalised with their name and addressed only to them. Recipients never see each other's addresses.
 
-It is a small Python command-line tool with no third-party dependencies. It works with any SMTP provider, such as Gmail, Google Workspace or Microsoft 365.
+It's a small Python tool with no third-party dependencies. You can use it from a web page that runs only on your computer, or from the command line. It works with any SMTP provider, such as Gmail, Google Workspace or Microsoft 365.
 
 ---
 
@@ -15,6 +15,25 @@ Requires **Python 3.11+**.
 ```bash
 pip install -e .                     # installs the `email-sender` command
 cp .env.example .env                 # then fill in your SMTP details
+```
+
+### Using the web page (easiest)
+
+```bash
+email-sender ui
+```
+
+Your browser opens the page. Keep the terminal window open while you use it, and press Ctrl+C there to stop.
+
+- **Recipients:** add people, edit names and tags, and mark people as unsubscribed. Then click **Save list**, which saves to `data/recipients.csv`.
+- **Compose & send:** pick or write a template, choose a group (for example *tester*), and check the live preview. Then click **Send test to me**, and finally **Send to N people**. Progress shows on the page, and you can stop partway.
+- **History:** see each campaign and how many people received it.
+
+The page only works on your own computer, and only through the link printed in the terminal.
+
+### Using the command line
+
+```bash
 cp data/recipients.example.csv data/recipients.csv   # then add your real list
 ```
 

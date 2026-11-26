@@ -9,6 +9,10 @@ A command-line tool for emailing our app's testers and subscribers. Each person 
 
 ## The usual workflow
 
+The easiest way is the web page: run `email-sender ui`, then use the **Recipients** tab, then **Compose & send**. See [Usage](Usage).
+
+From the command line:
+
 1. Update `data/recipients.csv` with new sign-ups and unsubscribes.
 2. Write or reuse a template in `templates/`.
 3. Preview: `email-sender -t templates/<file>.txt -r data/recipients.csv --tag tester`

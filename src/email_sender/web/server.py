@@ -148,8 +148,9 @@ class App:
         return {
             "version": __version__, "sender": sender, "config_error": config_error,
             "smtp_ready": smtp_error is None, "smtp_error": smtp_error,
-            "paths": {"recipients": str(self.recipients_path), "templates": str(self.templates.directory),
-                      "env": str(self.env_file), "log": str(self.log.path)},
+            "paths": {"recipients": str(self.recipients_path.resolve()),
+                      "templates": str(self.templates.directory.resolve()),
+                      "env": str(self.env_file.resolve()), "log": str(self.log.path.resolve())},
         }
 
     def tags(self) -> dict:

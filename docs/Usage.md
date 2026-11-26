@@ -16,6 +16,24 @@ Copy `.env.example` to `.env` and fill it in. Any of these can also be set as re
 
 **Gmail / Google Workspace:** turn on 2-step verification, create an [App Password](https://myaccount.google.com/apppasswords), and use it as `SMTP_PASSWORD`. Gmail allows about 500 recipients a day (Workspace about 2,000). For bigger lists, use `--limit` to spread sending over several days, or switch to a transactional email provider.
 
+## Using the web page
+
+Run `email-sender ui` from the project folder. Your browser opens the page. If it doesn't, copy the link printed in the terminal, which includes a one-time access key. Keep the terminal window open while you use the page.
+
+| Tab | What you do there |
+| --- | --- |
+| **Recipients** | Add people (**+ Add person**), edit any cell, and set the status to *unsubscribed* when someone opts out. Invalid or duplicate addresses are highlighted. Click **Save list**, or press Ctrl+S. A copy of the previous version is kept as `data/recipients.csv.bak`. |
+| **Compose & send** | Choose a template or create one with **New template**. Insert personal details with the *First name / Full name / Email address* buttons, and click **Save template**. Pick a group, check the preview (you can choose who to preview it as), click **Send test to me**, then **Send to N people**. |
+| **History** | Each campaign: how many people received it, how many addresses were refused, and when it last ran. |
+
+Good to know:
+
+- **What's saved is what gets sent.** The send buttons stay disabled until the template and the list are saved.
+- If the list changes between the preview and clicking Send, the send is refused, so you can check the new numbers first.
+- If you edit the CSV in Excel while the page is open, the page won't overwrite those changes. It asks you to reload instead. If saving fails because the file is open in Excel, close the file in Excel and save again.
+- **Stop** finishes the email in progress and then stops. Click Send again later to continue with the people who haven't had it yet.
+- Options: `email-sender ui --port 8765 --delay 1 --no-browser --recipients data/recipients.csv --templates templates`.
+
 ## 2. Recipient list (`data/recipients.csv`)
 
 ```csv

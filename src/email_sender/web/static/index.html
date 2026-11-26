@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Email Sender</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h13A2.5 2.5 0 0 1 21 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5v-11Zm2.2-.4 6.8 5.3 6.8-5.3a.9.9 0 0 0-.3-.1h-13a.9.9 0 0 0-.3.1ZM19 8.2l-6.4 5a1 1 0 0 1-1.2 0L5 8.2v9.3c0 .3.2.5.5.5h13c.3 0 .5-.2.5-.5V8.2Z" fill="currentColor"/></svg>
+    <span>Email Sender</span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" type="button" role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="true">Recipients</button>
+    <button class="tab" type="button" role="tab" id="tab-compose" aria-controls="panel-compose" aria-selected="false">Compose &amp; send</button>
+    <button class="tab" type="button" role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false">History</button>
+  </nav>
+  <div class="sender" id="sender" title="Emails are sent from this address (set in .env)"></div>
+</header>
+
+<div class="banner" id="banner" role="alert" hidden></div>
+
+<main>
+  <!-- Recipients -->
+  <section class="panel" id="panel-recipients" role="tabpanel" aria-labelledby="tab-recipients">
+    <div class="panel-head">
+      <div>
+        <h1>Recipients</h1>
+        <p class="sub" id="r-counts">Loading…</p>
+      </div>
+      <div class="actions">
+        <span class="dirty" id="r-dirty" hidden>Unsaved changes</span>
+        <button class="btn" type="button" id="r-reload">Reload</button>
+        <button class="btn primary" type="button" id="r-save" disabled>Save list</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input class="search" type="search" id="r-search" placeholder="Search name, email or tag" aria-label="Search recipients">
+      <select id="r-filter" aria-label="Show">
+        <option value="">Everyone</option>
+        <option value="subscribed">Subscribed</option>
+        <option value="not">Not receiving emails</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="btn" type="button" id="r-add">+ Add person</button>
+    </div>
+    <div class="error-box" id="r-errors" hidden></div>
+    <div class="card flush table-wrap">
+      <table class="grid" id="r-table">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="r-empty" hidden></div>
+    </div>
+    <p class="hint">Saved to <code id="r-path"></code>. When someone asks to stop getting emails, set their status to
+      <b>unsubscribed</b> instead of removing them, so they can't be added back by accident. Tags are words like
+      <i>tester</i> or <i>beta</i>, separated by spaces, that let you email one group.</p>
+  </section>
+
+  <!-- Compose & send -->
+  <section class="panel" id="panel-compose" role="tabpanel" aria-labelledby="tab-compose" hidden>
+    <div class="panel-head">
+      <div>
+        <h1>Compose &amp; send</h1>
+        <p class="sub">Everyone gets their own copy, so nobody sees anyone else's address.</p>
+      </div>
+    </div>
+    <div class="compose">
+      <div class="col">
+        <div class="card">
+          <div class="card-head">
+            <h2>Message</h2>
+            <div class="actions">
+              <select id="c-template" aria-label="Template"></select>
+              <button class="btn small" type="button" id="c-new">New template</button>
+            </div>
+          </div>
+          <label class="field"><span>Subject</span><input type="text" id="c-subject" autocomplete="off"></label>
+          <div class="chips" id="c-chips">
+            <span class="muted small">Insert:</span>
+            <button type="button" class="chip" data-ph="first_name">First name</button>
+            <button type="button" class="chip" data-ph="name">Full name</button>
+            <button type="button" class="chip" data-ph="email">Email address</button>
+          </div>
+          <label class="field"><span>Message</span><textarea id="c-text" rows="15"></textarea></label>
+          <details class="html-wrap" id="c-html-wrap">
+            <summary>HTML version <span class="muted">(optional, for a designed email)</span></summary>
+            <textarea id="c-html" rows="10" spellcheck="false" placeholder="<p>Hi $first_name,</p>"></textarea>
+          </details>
+          <div class="card-foot">
+            <span class="muted small">An unsubscribe note is added to every email for you. Type $$ for a dollar sign.</span>
+            <span class="spacer"></span>
+            <span class="dirty" id="c-dirty" hidden>Unsaved</span>
+            <button class="btn primary" type="button" id="c-save" disabled>Save template</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <h2>Who gets it</h2>
+          <div class="tag-picks" id="c-tags"></div>
+          <label class="field"><span>Campaign name</span><input type="text" id="c-campaign" autocomplete="off"></label>
+          <p class="muted small">People who already received this campaign are skipped, so you can safely send again
+            after adding new people. Use a new name to send it to everyone again.</p>
+          <div class="stats">
+            <div class="stat"><b id="s-eligible">–</b><span>in this group</span></div>
+            <div class="stat"><b id="s-done">–</b><span>already got it</span></div>
+            <div class="stat accent"><b id="s-todo">–</b><span>will get it now</span></div>
+          </div>
+          <div class="note warn" id="c-list-error" hidden></div>
+          <details class="list" id="c-who" hidden><summary></summary><ul></ul></details>
+          <details class="list" id="c-skipped" hidden><summary></summary><ul></ul></details>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Preview</h2>
+            <label class="inline"><span class="muted small">as</span><select id="p-as" aria-label="Preview as"></select></label>
+          </div>
+          <div class="error-box" id="p-error" hidden></div>
+          <div class="mail" id="p-mail">
+            <dl class="mail-head">
+              <dt>From</dt><dd id="p-from"></dd>
+              <dt>To</dt><dd id="p-to"></dd>
+              <dt>Subject</dt><dd id="p-subject"></dd>
+            </dl>
+            <div class="seg" id="p-seg" hidden>
+              <button type="button" id="p-view-html" aria-pressed="true">Designed (HTML)</button>
+              <button type="button" id="p-view-text" aria-pressed="false">Plain text</button>
+            </div>
+            <pre class="mail-body" id="p-text"></pre>
+            <iframe class="mail-html" id="p-html" sandbox title="HTML preview" hidden></iframe>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Send</h2>
+          <div class="row">
+            <input type="email" id="t-to" placeholder="you@example.com" aria-label="Send a test to">
+            <button class="btn" type="button" id="t-send">Send test to me</button>
+          </div>
+          <button class="btn primary big" type="button" id="send" disabled>Send</button>
+          <p class="muted small" id="send-hint"></p>
+          <div class="job" id="job" hidden>
+            <div class="job-head">
+              <strong id="job-title"></strong>
+              <button class="btn small danger" type="button" id="job-stop">Stop</button>
+            </div>
+            <div class="bar"><div id="job-bar"></div></div>
+            <p class="small" id="job-msg"></p>
+            <details><summary class="small">Details</summary><ol class="log" id="job-lines"></ol></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section class="panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+    <div class="panel-head">
+      <div>
+        <h1>History</h1>
+        <p class="sub">Campaigns sent from this computer.</p>
+      </div>
+      <div class="actions"><button class="btn" type="button" id="h-reload">Refresh</button></div>
+    </div>
+    <div class="card flush">
+      <table class="grid static" id="h-table">
+        <thead><tr><th>Campaign</th><th class="num">Sent</th><th class="num">Not delivered</th><th>Last activity</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="h-empty" hidden>Nothing has been sent yet.</div>
+    </div>
+    <p class="hint">Kept in <code id="h-path"></code>. "Not delivered" are addresses the mail server refused. They
+      are tried again the next time you send that campaign.</p>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog class="dialog" id="dlg" aria-labelledby="dlg-title">
+  <h2 id="dlg-title"></h2>
+  <p id="dlg-msg"></p>
+  <input type="text" id="dlg-input" autocomplete="off" hidden>
+  <div class="dialog-actions">
+    <button class="btn" type="button" id="dlg-cancel">Cancel</button>
+    <button class="btn primary" type="button" id="dlg-ok">OK</button>
+  </div>
+</dialog>
+</body>
+</html>

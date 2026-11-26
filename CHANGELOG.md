@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Encrypted SMTP only (STARTTLS or SSL), with settings read from `.env` or environment variables (`.env.example` provided).
 - Example recipient list and welcome template, unit tests, and `pyproject.toml`.
 - Wiki pages `docs/Usage.md` and `docs/Privacy-and-Security.md`.
+- Web page (`email-sender ui`) that runs only on your own computer, with three tabs:
+  - **Recipients:** edit the list in a table, with validation, duplicate highlighting, a backup copy on every save, and protection against overwriting changes made in Excel.
+  - **Compose & send:** template editor with placeholder buttons, group picker, live preview as any recipient, a test send, and sending with live progress and Stop.
+  - **History:** per-campaign totals.
+- The page is protected by a per-start access key, host and origin checks, and a strict Content-Security-Policy, and it never receives the SMTP password.
+
+### Fixed
+- The docs sync workflow no longer wipes other branches (`rsync --delete` on the repository root), and it skips Dependabot branches.
 
 ### Changed
 - `README.md` now describes the email sender instead of the repository template.

@@ -15,3 +15,6 @@ email-sender = "email_sender.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"email_sender.web" = ["static/*"]
