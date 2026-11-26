@@ -1,6 +1,6 @@
-Subject: Welcome to the beta, $first_name!
+Subject: Welcome to the beta, Joni
 
-Hi $first_name,
+Hi Joni
 
 Thanks for signing up to test our app. You're on the list, and we'll email
 you at $email as soon as the next test build is ready.

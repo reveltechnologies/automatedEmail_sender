@@ -8,6 +8,8 @@ so other websites open in the same browser cannot read or send anything.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import json
 import secrets
 import smtplib
@@ -23,6 +25,8 @@ from urllib.parse import unquote, urlsplit
 from .. import __version__
 from ..campaign import Plan, build_messages, build_test_message, plan_campaign, sample_recipient
 from ..config import ConfigError, load_settings
+from ..importer import (MAX_SOURCE_LENGTH, ImportFileError, Mapping, apply_import, decode_upload, guess_mapping,
+                        parse_tags, plan_import, read_table)
 from ..recipients import RecipientError, is_valid_email
 from ..sender import SendLog, build_message, open_smtp, send_all, send_test
 from ..templates import TemplateError, compose_template_text, parse_template, render
@@ -259,6 +263,73 @@ class App:
         self.job.stop_requested = True
         return self.job.snapshot()
 
+    # ---- import --------------------------------------------------------
+    def _import_plan(self, body: dict):
+        """Read the uploaded file or pasted text and work out the merge against the saved list."""
+        if body.get("file") is not None:
+            try:
+                data = base64.b64decode(self._text(body, "file"), validate=True)
+            except (binascii.Error, ValueError):
+                raise StoreError("The file couldn't be read. Choose it again.") from None
+            text = decode_upload(data)
+        else:
+            text = self._text(body, "text")
+            if not text.strip():
+                raise StoreError("Choose a file or paste some addresses first.")
+        table = read_table(text)
+        if table.header is None:
+            mapping = None
+        elif body.get("mapping") is None:
+            mapping = guess_mapping(table)
+        else:
+            mapping = Mapping.from_dict(body.get("mapping"), table.width)
+
+        tags_value = body.get("tags", [])
+        if not isinstance(tags_value, (list, str)) or (isinstance(tags_value, list)
+                                                       and not all(isinstance(t, str) for t in tags_value)):
+            raise StoreError("'tags' must be text")
+        tags = parse_tags(tags_value)
+        source = " ".join(self._text(body, "source").split())
+        if len(source) > MAX_SOURCE_LENGTH:
+            raise StoreError(f"“Where they signed up” is too long (max {MAX_SOURCE_LENGTH} characters).")
+
+        current = self.table.load()
+        plan = plan_import(table, mapping, current["columns"], current["rows"], tags=tags)
+        return table, mapping, tags, source, current, plan
+
+    def import_preview(self, body: dict) -> dict:
+        table, mapping, _, _, current, plan = self._import_plan(body)
+        return {
+            "has_header": table.header is not None,
+            "columns": table.column_names() if table.header is not None else [],
+            "mapping": mapping.to_dict() if mapping else None,
+            "rows_read": len(table.rows),
+            "version": current["version"],
+            **plan.to_dict(),
+        }
+
+    def import_apply(self, body: dict) -> dict:
+        table, mapping, tags, source, current, plan = self._import_plan(body)
+        if not plan.add and not plan.update:
+            raise StoreError("There is nobody new to add and nothing to update.")
+        if body.get("version") != current["version"]:
+            raise StoreError("The recipient list changed while the import window was open. "
+                             "Close it, check the list and import again.", status=409)
+        columns, rows = apply_import(plan, current["columns"], current["rows"], tags=tags, source=source)
+        try:
+            saved = self.table.save(columns, rows, current["version"])
+        except StoreError as exc:
+            if exc.details:  # the list itself has problems (e.g. edited in Excel)
+                problems = "; ".join(f"row {d['row'] + 1}: {d['message']}" for d in exc.details[:5])
+                raise StoreError(f"Your list has rows that need fixing first ({problems}). "
+                                 "Fix them on the Recipients tab, save, and import again.") from None
+            raise
+        parts = [f"{len(plan.add)} added"]
+        if plan.update:
+            parts.append(f"{len(plan.update)} updated")
+        return {"list": saved, "added": len(plan.add), "updated": len(plan.update),
+                "message": f"Import done: {', '.join(parts)}."}
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "email-sender"
@@ -358,7 +429,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, result)
         except StoreError as exc:
             self._error(exc.status, str(exc), exc.details)
-        except (ConfigError, RecipientError, TemplateError) as exc:
+        except (ConfigError, RecipientError, TemplateError, ImportFileError) as exc:
             self._error(HTTPStatus.BAD_REQUEST, str(exc))
         except smtplib.SMTPAuthenticationError:
             self._error(HTTPStatus.BAD_GATEWAY, AUTH_HINT)
@@ -384,6 +455,8 @@ class Handler(BaseHTTPRequestHandler):
             ("PUT", "/api/recipients"): lambda: app.table.save(body.get("columns"), body.get("rows"),
                                                                body.get("version")),
             ("GET", "/api/tags"): app.tags,
+            ("POST", "/api/import/preview"): lambda: app.import_preview(body),
+            ("POST", "/api/import/apply"): lambda: app.import_apply(body),
             ("GET", "/api/templates"): lambda: {"templates": app.templates.list()},
             ("POST", "/api/preview"): lambda: app.preview(body),
             ("POST", "/api/test"): lambda: app.send_test(body),

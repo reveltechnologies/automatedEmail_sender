@@ -1,3 +1,4 @@
+import base64
 import http.client
 import json
 import os
@@ -256,6 +257,70 @@ class SendJobTests(ServerTestCase):
         status, body, _ = self.request("POST", "/api/send", {"template": "unsaved", "expected": 3})
         self.assertEqual(status, 404)
         self.assertIn("Save it first", body["error"])
+
+
+class ImportTests(ServerTestCase):
+    FORM = ("Timestamp,Email address,Name\n"
+            "2026/11/20 9:15,new@example.com,New Person\n"
+            "2026/11/21 9:15,di@example.com,Di\n"
+            "2026/11/22 9:15,cy@example.com,Cy\n"
+            "2026/11/23 9:15,oops,Oops\n")
+
+    def file_body(self, text, **extra):
+        return {"file": base64.b64encode(text.encode("utf-8")).decode(), "tags": "tester", "source": "Form", **extra}
+
+    def test_preview_changes_nothing_and_apply_merges(self):
+        before = (self.root / "data" / "recipients.csv").read_bytes()
+        status, preview, _ = self.request("POST", "/api/import/preview", self.file_body(self.FORM))
+        self.assertEqual(status, 200)
+        self.assertTrue(preview["has_header"])
+        self.assertEqual(preview["mapping"], {"email": 1, "name": [2], "date": 0, "consent": None})
+        self.assertEqual([p["email"] for p in preview["add"]], ["new@example.com"])
+        self.assertEqual(preview["blocked"], [{"email": "di@example.com", "status": "unsubscribed"}])
+        self.assertEqual(preview["update"], [{"email": "cy@example.com", "row": 2, "tags": ["tester"], "name": ""}])
+        self.assertEqual(len(preview["skipped"]), 1)
+        self.assertEqual((self.root / "data" / "recipients.csv").read_bytes(), before)
+
+        status, result, _ = self.request("POST", "/api/import/apply",
+                                         self.file_body(self.FORM, version=preview["version"]))
+        self.assertEqual(status, 200, result)
+        self.assertEqual((result["added"], result["updated"]), (1, 1))
+        listing = result["list"]
+        self.assertEqual(listing["columns"], ["email", "name", "status", "tags", "signed_up", "source"])
+        self.assertIn(["new@example.com", "New Person", "subscribed", "tester", "2026/11/20 9:15", "Form"],
+                      listing["rows"])
+        self.assertIn(["di@example.com", "Di", "unsubscribed", "tester", "", ""], listing["rows"])
+        self.assertTrue((self.root / "data" / "recipients.csv.bak").is_file())
+
+    def test_apply_refuses_when_the_list_changed(self):
+        _, preview, _ = self.request("POST", "/api/import/preview", {"text": "x@example.com"})
+        with (self.root / "data" / "recipients.csv").open("a", encoding="utf-8") as fh:
+            fh.write("zed@example.com,Zed,,\n")
+        status, body, _ = self.request("POST", "/api/import/apply", {"text": "x@example.com", "version": preview["version"]})
+        self.assertEqual(status, 409)
+        self.assertIn("changed", body["error"])
+
+    def test_chosen_columns_and_errors(self):
+        status, body, _ = self.request("POST", "/api/import/preview",
+                                       self.file_body(self.FORM, mapping={"email": 1, "name": [], "date": None}))
+        self.assertEqual(status, 200)
+        self.assertEqual(body["add"][0]["name"], "")
+        status, body, _ = self.request("POST", "/api/import/preview", self.file_body(self.FORM, mapping={"email": 9}))
+        self.assertEqual(status, 400)
+        status, body, _ = self.request("POST", "/api/import/preview", {"file": "not base64!"})
+        self.assertEqual(status, 400)
+        status, body, _ = self.request("POST", "/api/import/preview", {"text": "  "})
+        self.assertEqual(status, 400)
+        status, body, _ = self.request("POST", "/api/import/apply", {"text": "ana@example.com", "version": "x"})
+        self.assertEqual(status, 400)  # nothing to do is reported before the version check
+        self.assertIn("nobody new", body["error"])
+
+    def test_import_into_a_new_list(self):
+        (self.root / "data" / "recipients.csv").unlink()
+        _, preview, _ = self.request("POST", "/api/import/preview", {"text": "ana@example.com"})
+        status, result, _ = self.request("POST", "/api/import/apply", {"text": "ana@example.com", "version": preview["version"]})
+        self.assertEqual(status, 200, result)
+        self.assertEqual(result["list"]["rows"][0][:3], ["ana@example.com", "", "subscribed"])
 
 
 class CliEntryTests(unittest.TestCase):

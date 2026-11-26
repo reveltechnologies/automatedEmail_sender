@@ -128,7 +128,11 @@ def open_smtp(settings: Settings, timeout: float = 30.0) -> smtplib.SMTP:
             server.ehlo()
             server.starttls(context=context)  # raises if the server can't encrypt
             server.ehlo()
-        server.login(settings.smtp_username, settings.smtp_password)
+        try:
+            server.login(settings.smtp_username, settings.smtp_password)
+        except smtplib.SMTPServerDisconnected as exc:
+            # Gmail sometimes hangs up on a bad password instead of answering 535.
+            raise smtplib.SMTPAuthenticationError(535, b"server closed the connection during login") from exc
     except BaseException:
         server.close()
         raise

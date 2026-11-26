@@ -2,9 +2,10 @@ import smtplib
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from email_sender.recipients import Recipient
-from email_sender.sender import SendLog, build_message, send_all
+from email_sender.sender import SendLog, build_message, open_smtp, send_all
 from email_sender.templates import RenderedEmail
 
 from .helpers import FakeSMTP, make_settings
@@ -14,6 +15,33 @@ def message_for(email, name=""):
     settings = make_settings()
     recipient = Recipient(email, name)
     return recipient, build_message(settings, recipient, RenderedEmail("Hello", "Body\n"))
+
+
+class OpenSmtpTests(unittest.TestCase):
+    def test_hang_up_during_login_is_reported_as_a_login_failure(self):
+        closed = []
+
+        class HangsUpOnLogin:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def ehlo(self):
+                pass
+
+            def starttls(self, context=None):
+                pass
+
+            def login(self, user, password):
+                raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+
+            def close(self):
+                closed.append(True)
+
+        settings = make_settings(smtp_security="starttls")
+        with mock.patch("smtplib.SMTP", HangsUpOnLogin):
+            with self.assertRaises(smtplib.SMTPAuthenticationError):
+                open_smtp(settings)
+        self.assertEqual(closed, [True])
 
 
 class BuildMessageTests(unittest.TestCase):

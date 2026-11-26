@@ -265,3 +265,23 @@ details.list li .muted { margin-left: 6px; }
 .dialog p { margin: 0 0 14px; color: var(--muted); white-space: pre-line; }
 .dialog input { width: 100%; margin-bottom: 14px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---------- import ---------- */
+.dialog.wide { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+.imp-intro { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+.imp-source { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.imp-source label.btn { flex: none; }
+#imp-file:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.imp-more { margin-bottom: 10px; font-size: 13px; }
+.imp-more summary { cursor: pointer; color: var(--accent); font-weight: 550; }
+.imp-more textarea { margin-top: 8px; font: 12.5px/1.5 var(--mono); }
+.imp-more ol { margin: 8px 0 4px; padding-left: 20px; }
+.imp-more p { margin: 0; white-space: normal; }
+#imp-body { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
+.imp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.imp-grid select, .imp-grid input { width: 100%; }
+@media (max-width: 560px) { .imp-grid { grid-template-columns: 1fr; } }
+.stats.four { grid-template-columns: repeat(4, 1fr); margin-top: 4px; }
+@media (max-width: 560px) { .stats.four { grid-template-columns: repeat(2, 1fr); } }
+#imp .dialog-actions { margin-top: 16px; }
+#imp input { margin-bottom: 0; }

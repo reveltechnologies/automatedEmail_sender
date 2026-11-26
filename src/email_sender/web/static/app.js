@@ -197,7 +197,7 @@
     empty.hidden = shown > 0;
     empty.textContent = rec.rows.length
       ? "Nobody matches this search."
-      : "Nobody on the list yet. Click “+ Add person” to add your first tester.";
+      : "Nobody on the list yet. Click “+ Add person”, or “Import…” to add the people from a Google Form or spreadsheet.";
     validateEmails();
     updateRecipientMeta();
   }
@@ -359,6 +359,7 @@
     $("r-search").addEventListener("input", renderRecipients);
     $("r-filter").addEventListener("change", renderRecipients);
     $("r-add").addEventListener("click", addPerson);
+    $("r-import").addEventListener("click", () => openImport().catch((err) => toast(err.message, "error")));
     $("r-save").addEventListener("click", saveRecipients);
     $("r-reload").addEventListener("click", async () => {
       if (rec.dirty && !(await ask({ title: "Discard unsaved changes?", message: "Reloading replaces your edits with the saved list.", confirm: "Discard", danger: true }))) return;
@@ -366,8 +367,211 @@
     });
   }
 
+  // ---------------------------------------------------------------- import
+  // The file is sent to the local server as base64 so it can unzip Google Forms downloads and
+  // detect the text encoding. Nothing is saved until "Import" is clicked.
+  const MAX_IMPORT_BYTES = 3 * 1024 * 1024;
+  const IMPORT_FILE_HINT = "CSV file, or the .zip that Google Forms downloads";
+  const imp = { file: null, data: null, seq: 0, timer: null, mappingTouched: false, columnsKey: "" };
+
+  function bytesToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary);
+  }
+
+  function resetImportSource() {
+    Object.assign(imp, { data: null, mappingTouched: false, columnsKey: "" });
+  }
+
+  function showImportError(message) {
+    $("imp-error").textContent = message || "";
+    $("imp-error").hidden = !message;
+  }
+
+  async function openImport() {
+    if (rec.dirty) {
+      const ok = await ask({ title: "Save the list first?",
+        message: "The list has unsaved changes. They need to be saved before importing.", confirm: "Save and continue" });
+      if (!ok) return;
+      await saveRecipients();
+      if (rec.dirty) return; // saving failed; the error is shown on the tab
+    }
+    imp.file = null;
+    resetImportSource();
+    $("imp-file").value = "";
+    $("imp-file-name").textContent = IMPORT_FILE_HINT;
+    $("imp-paste").value = "";
+    $("imp-tags").value = "tester";
+    $("imp-src").value = "";
+    showImportError("");
+    $("imp-body").hidden = true;
+    $("imp-ok").disabled = true;
+    $("imp-ok").textContent = "Import";
+    $("imp").showModal();
+  }
+
+  function importBody() {
+    const body = { tags: $("imp-tags").value, source: $("imp-src").value };
+    if (imp.file !== null) body.file = imp.file;
+    else body.text = $("imp-paste").value;
+    if (imp.data && imp.data.has_header && imp.mappingTouched) body.mapping = currentMapping();
+    return body;
+  }
+
+  function currentMapping() {
+    const num = (id) => ($(id).value === "" ? null : Number($(id).value));
+    const name = $("imp-name").value;
+    return { email: num("imp-email"), name: name ? name.split("+").map(Number) : [],
+      date: num("imp-date"), consent: num("imp-consent") };
+  }
+
+  function fillSelect(select, options, value) {
+    select.replaceChildren(...options.map(([v, label]) => el("option", { value: v, text: label })));
+    select.value = value;
+  }
+
+  function renderImportMapping(d) {
+    $("imp-map").hidden = !d.has_header;
+    if (!d.has_header) return;
+    const m = d.mapping;
+    const nameValue = m.name.join("+");
+    const key = JSON.stringify(d.columns);
+    if (key !== imp.columnsKey) {  // a new file: build the choices once
+      imp.columnsKey = key;
+      const cols = d.columns.map((label, i) => [String(i), label]);
+      const nameOptions = [["", "(no name column)"], ...cols];
+      if (m.name.length > 1) nameOptions.splice(1, 0, [nameValue, m.name.map((i) => d.columns[i]).join(" + ")]);
+      fillSelect($("imp-email"), cols, String(m.email));
+      fillSelect($("imp-name"), nameOptions, nameValue);
+      fillSelect($("imp-date"), [["", "(use today's date)"], ...cols], m.date == null ? "" : String(m.date));
+      fillSelect($("imp-consent"), [["", "(no such question: import everyone)"], ...cols],
+        m.consent == null ? "" : String(m.consent));
+    }
+  }
+
+  function renderImport(d) {
+    const li = (text, extra) => el("li", {}, text, ...(extra ? [el("span", { class: "muted", text: extra })] : []));
+    const same = d.unchanged.length + d.blocked.length;
+    $("imp-n-add").textContent = d.add.length;
+    $("imp-n-update").textContent = d.update.length;
+    $("imp-n-same").textContent = same;
+    $("imp-n-skip").textContent = d.skipped.length;
+    fillList($("imp-l-add"), d.add.map((p) => li(p.email, p.name)),
+      `${plural(d.add.length, "new person", "new people")} will be added`);
+    fillList($("imp-l-update"), d.update.map((u) => li(u.email, [
+      u.tags.length ? `+ ${u.tags.join(" ")}` : "", u.name ? `name: ${u.name}` : ""].filter(Boolean).join(" · "))),
+      `${plural(d.update.length, "person", "people")} already on the list will be updated`);
+    fillList($("imp-l-blocked"), d.blocked.map((b) => li(b.email, b.status)),
+      `${plural(d.blocked.length, "person", "people")} unsubscribed or bounced, so they're not added back`);
+    fillList($("imp-l-same"), d.unchanged.map((email) => li(email)),
+      `${plural(d.unchanged.length, "person is", "people are")} already on the list, nothing to change`);
+    fillList($("imp-l-skip"), d.skipped.map((s) => li(`Row ${s.row}: ${s.reason}`)),
+      `${plural(d.skipped.length, "row", "rows")} skipped`);
+    const ok = $("imp-ok");
+    ok.disabled = d.add.length + d.update.length === 0;
+    ok.textContent = d.add.length ? `Import ${plural(d.add.length, "person", "people")}`
+      : d.update.length ? `Update ${plural(d.update.length, "person", "people")}` : "Nothing to import";
+  }
+
+  function scheduleImport(ms = 300) {
+    clearTimeout(imp.timer);
+    imp.timer = setTimeout(() => runImportPreview(), ms);
+  }
+
+  async function runImportPreview() {
+    clearTimeout(imp.timer);
+    const seq = ++imp.seq;
+    if (imp.file === null && !$("imp-paste").value.trim()) {
+      imp.data = null;
+      showImportError("");
+      $("imp-body").hidden = true;
+      $("imp-ok").disabled = true;
+      return;
+    }
+    try {
+      const d = await api("POST", "/api/import/preview", importBody());
+      if (seq !== imp.seq) return;
+      imp.data = d;
+      showImportError("");
+      renderImportMapping(d);
+      renderImport(d);
+      $("imp-body").hidden = false;
+    } catch (err) {
+      if (seq !== imp.seq) return;
+      imp.data = null;
+      showImportError(err.message);
+      $("imp-body").hidden = true;
+      $("imp-ok").disabled = true;
+    }
+  }
+
+  async function applyImport() {
+    if (!imp.data || $("imp-ok").disabled) return;
+    setBusy($("imp-ok"), true, "Importing…");
+    try {
+      const d = await api("POST", "/api/import/apply", { ...importBody(), version: imp.data.version });
+      $("imp").close();
+      Object.assign(rec, { columns: d.list.columns, rows: d.list.rows, version: d.list.version, dirty: false, errors: new Map() });
+      $("r-errors").hidden = true;
+      $("r-search").value = "";
+      $("r-filter").value = "";
+      renderRecipients();
+      toast(d.message);
+      loadTags().catch(() => {});
+      schedulePreview(0);
+    } catch (err) {
+      showImportError(err.message);
+    } finally {
+      setBusy($("imp-ok"), false);
+    }
+  }
+
+  function wireImport() {
+    $("imp-file").addEventListener("change", async () => {
+      const file = $("imp-file").files[0];
+      if (!file) return;
+      ++imp.seq;  // ignore a preview still running for the previous input
+      imp.file = null;
+      resetImportSource();
+      $("imp-file-name").textContent = file.name;
+      $("imp-paste").value = "";
+      $("imp-paste-wrap").open = false;
+      if (file.size > MAX_IMPORT_BYTES) {
+        $("imp-body").hidden = true;
+        $("imp-ok").disabled = true;
+        showImportError("This file is too big to import (the limit is 3 MB).");
+        return;
+      }
+      imp.file = bytesToBase64(await file.arrayBuffer());
+      if (!$("imp-src").value) {
+        $("imp-src").value = file.name.replace(/\.(csv|txt|zip)$/i, "").replace(/\s*\(responses\)\s*$/i, "").slice(0, 100);
+      }
+      runImportPreview();
+    });
+    $("imp-paste").addEventListener("input", () => {
+      if (imp.file !== null) {
+        imp.file = null;
+        $("imp-file").value = "";
+        $("imp-file-name").textContent = IMPORT_FILE_HINT;
+      }
+      resetImportSource();
+      scheduleImport();
+    });
+    for (const id of ["imp-email", "imp-name", "imp-date", "imp-consent"]) {
+      $(id).addEventListener("change", () => { imp.mappingTouched = true; runImportPreview(); });
+    }
+    $("imp-tags").addEventListener("input", () => scheduleImport());
+    $("imp-src").addEventListener("input", () => scheduleImport());
+    $("imp-cancel").addEventListener("click", () => $("imp").close());
+    $("imp-ok").addEventListener("click", applyImport);
+  }
+
   // ================================================================ compose
-  const tpl = { names: [], name: null, isNew: false, dirty: false, saved: null };
+  const tpl ={ names: [], name: null, isNew: false, dirty: false, saved: null };
   const audience = { tags: new Set(), allTags: [] };
   let previewData = null;
   let previewError = null;
@@ -763,6 +967,7 @@
     }
     wireGlobal();
     wireRecipients();
+    wireImport();
     wireCompose();
     try {
       await loadStatus();

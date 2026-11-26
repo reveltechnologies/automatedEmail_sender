@@ -22,7 +22,7 @@ On Windows, double-click `start.bat` in the project folder (no install needed). 
 
 | Tab | What you do there |
 | --- | --- |
-| **Recipients** | Add people (**+ Add person**), edit any cell, and set the status to *unsubscribed* when someone opts out. Invalid or duplicate addresses are highlighted. Click **Save list**, or press Ctrl+S. A copy of the previous version is kept as `data/recipients.csv.bak`. |
+| **Recipients** | Add people (**+ Add person**, or **Import…** for many at once, see below), edit any cell, and set the status to *unsubscribed* when someone opts out. Invalid or duplicate addresses are highlighted. Click **Save list**, or press Ctrl+S. A copy of the previous version is kept as `data/recipients.csv.bak`. |
 | **Compose & send** | Choose a template or create one with **New template**. Insert personal details with the *First name / Full name / Email address* buttons, and click **Save template**. Pick a group, check the preview (you can choose who to preview it as), click **Send test to me**, then **Send to N people**. |
 | **History** | Each campaign: how many people received it, how many addresses were refused, and when it last ran. |
 
@@ -33,6 +33,25 @@ Good to know:
 - If you edit the CSV in Excel while the page is open, the page won't overwrite those changes. It asks you to reload instead. If saving fails because the file is open in Excel, close the file in Excel and save again.
 - **Stop** finishes the email in progress and then stops. Click Send again later to continue with the people who haven't had it yet.
 - Options: `email-sender ui --port 8765 --delay 1 --no-browser --recipients data/recipients.csv --templates templates`.
+
+### Importing sign-ups (Google Forms, spreadsheets, pasted lists)
+
+On the **Recipients** tab, click **Import…** and choose a file, or paste addresses.
+
+- **Google Forms:** on the form's **Responses** tab, click **⋮** and then **Download responses (.csv)**. You can choose the downloaded `.zip` directly.
+- **Google Sheets:** File > Download > Comma-separated values. **Excel:** File > Save As > CSV UTF-8. Excel `.xlsx` files can't be imported directly.
+- **Pasting:** one address per line, or several separated by `,` or `;`. `Name <address>` also works.
+
+The page guesses which column holds the email address, the name (or first and last name), the sign-up date and a consent question such as "I agree to receive emails". Check its choices and change them if needed. Then choose the tags the new people get (default `tester`) and where they signed up. The window shows what will happen before anything is saved:
+
+| Shown as | What happens |
+| --- | --- |
+| **New people** | Added as *subscribed*, with your tags, `signed_up` (the form's timestamp, or today) and `source`. |
+| **Get updated** | Already on the list. They get any of your tags they don't have yet, and a name if theirs was empty. Their status is never changed. |
+| **Already on the list** | Nothing changes. This includes people who unsubscribed or bounced: **importing never subscribes them again.** |
+| **Skipped** | Invalid addresses, people who appear twice in the file, and, if you picked a consent column, people who left it empty or answered no. |
+
+The import is saved straight to the list file, and the previous version is kept as `recipients.csv.bak`.
 
 ## 2. Recipient list (`data/recipients.csv`)
 

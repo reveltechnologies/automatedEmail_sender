@@ -37,7 +37,9 @@ Only email people who **signed up** to test or to receive updates. Laws such as 
 
 - Every email includes an unsubscribe footer and a `List-Unsubscribe` header pointing to `UNSUBSCRIBE_EMAIL`. Someone must read that inbox.
 - When someone unsubscribes, set their `status` to `unsubscribed` before the next mailing.
-- Keep a note of when and how each person signed up.
+- Keep a note of when and how each person signed up. **Import…** on the web page does this for you: it fills the `signed_up` and `source` columns. If your form asks for consent, pick that question in the import window so people who didn't agree are skipped.
+- Importing never re-subscribes anyone whose status is `unsubscribed`, `bounced` or anything else that blocks them.
+- The import file stays on your computer. The page reads it and passes it to the local server only.
 
 ## Reporting a vulnerability
 

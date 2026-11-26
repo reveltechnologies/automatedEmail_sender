@@ -47,6 +47,7 @@
         <option value="not">Not receiving emails</option>
       </select>
       <span class="spacer"></span>
+      <button class="btn" type="button" id="r-import" title="Add many people at once, for example from a Google Form">Import…</button>
       <button class="btn" type="button" id="r-add">+ Add person</button>
     </div>
     <div class="error-box" id="r-errors" hidden></div>
@@ -183,6 +184,66 @@
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog class="dialog wide" id="imp" aria-labelledby="imp-title">
+  <h2 id="imp-title">Import sign-ups</h2>
+  <p class="imp-intro">Add many people at once, for example everyone who filled in your Google Form. Nobody is
+    added twice, and people who unsubscribed stay unsubscribed. Nothing changes until you click <b>Import</b>.</p>
+
+  <div class="imp-source">
+    <input type="file" id="imp-file" class="sr" accept=".csv,.txt,.zip,text/csv,text/plain">
+    <label class="btn" for="imp-file">Choose file…</label>
+    <span class="muted small" id="imp-file-name">CSV file, or the .zip that Google Forms downloads</span>
+  </div>
+  <details class="imp-more" id="imp-paste-wrap">
+    <summary>…or paste addresses</summary>
+    <textarea id="imp-paste" rows="4" spellcheck="false"
+      placeholder="One per line, for example:&#10;someone@example.com&#10;Sam Lee &lt;sam.lee@example.com&gt;"></textarea>
+  </details>
+  <details class="imp-more">
+    <summary>How do I get the file from Google Forms?</summary>
+    <ol class="small">
+      <li>Open your form and click the <b>Responses</b> tab.</li>
+      <li>Click <b>⋮</b> (More) and choose <b>Download responses (.csv)</b>.</li>
+      <li>Choose the downloaded file here. A .zip file is fine.</li>
+    </ol>
+    <p class="small muted">From Google Sheets: File &gt; Download &gt; Comma-separated values (.csv). From Excel: File &gt;
+      Save As &gt; CSV UTF-8.</p>
+  </details>
+
+  <div class="error-box" id="imp-error" hidden></div>
+
+  <div id="imp-body" hidden>
+    <div class="imp-grid" id="imp-map">
+      <label class="field"><span>Email address column</span><select id="imp-email"></select></label>
+      <label class="field"><span>Name column</span><select id="imp-name"></select></label>
+      <label class="field"><span>Sign-up date column</span><select id="imp-date"></select></label>
+      <label class="field"><span>Only people who agreed in column</span><select id="imp-consent"></select></label>
+    </div>
+    <div class="imp-grid">
+      <label class="field"><span>Give them these tags</span>
+        <input type="text" id="imp-tags" autocomplete="off" placeholder="e.g. tester beta"></label>
+      <label class="field"><span>Where they signed up</span>
+        <input type="text" id="imp-src" autocomplete="off" maxlength="100" placeholder="e.g. Beta sign-up form"></label>
+    </div>
+    <div class="stats four">
+      <div class="stat accent"><b id="imp-n-add">0</b><span>new people</span></div>
+      <div class="stat"><b id="imp-n-update">0</b><span>get updated</span></div>
+      <div class="stat"><b id="imp-n-same">0</b><span>already on the list</span></div>
+      <div class="stat"><b id="imp-n-skip">0</b><span>skipped</span></div>
+    </div>
+    <details class="list" id="imp-l-add"><summary></summary><ul></ul></details>
+    <details class="list" id="imp-l-update"><summary></summary><ul></ul></details>
+    <details class="list" id="imp-l-blocked"><summary></summary><ul></ul></details>
+    <details class="list" id="imp-l-same"><summary></summary><ul></ul></details>
+    <details class="list" id="imp-l-skip"><summary></summary><ul></ul></details>
+  </div>
+
+  <div class="dialog-actions">
+    <button class="btn" type="button" id="imp-cancel">Cancel</button>
+    <button class="btn primary" type="button" id="imp-ok" disabled>Import</button>
+  </div>
+</dialog>
 
 <dialog class="dialog" id="dlg" aria-labelledby="dlg-title">
   <h2 id="dlg-title"></h2>
