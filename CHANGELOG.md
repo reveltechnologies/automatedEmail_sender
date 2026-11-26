@@ -24,10 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Recipients:** edit the list in a table, with validation, duplicate highlighting, a backup copy on every save, and protection against overwriting changes made in Excel.
   - **Compose & send:** template editor with placeholder buttons, group picker, live preview as any recipient, a test send, and sending with live progress and Stop.
   - **History:** per-campaign totals.
+- **Import…** on the Recipients tab: add sign-ups from a CSV, the `.zip` that Google Forms downloads, or pasted addresses. It finds the email, name, date and consent columns, and shows new, updated and skipped people before saving. It never adds anyone twice and never re-subscribes someone who unsubscribed. New people get `signed_up` and `source` columns as a consent record.
 - `start.bat`: double-click launcher for the web page on Windows. It runs from the project folder without installing anything.
 - The page is protected by a per-start access key, host and origin checks, and a strict Content-Security-Policy, and it never receives the SMTP password.
 
 ### Fixed
+- When Gmail hangs up during login (as it does for a wrong password), this is now reported as a login problem with a hint about app passwords, instead of "Connection unexpectedly closed".
 - The docs sync workflow no longer wipes other branches (`rsync --delete` on the repository root), and it skips Dependabot branches.
 
 ### Changed
